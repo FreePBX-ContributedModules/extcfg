@@ -3,7 +3,7 @@
 	<name>Extension Settings</name>
 	<version>0.1</version>
 	<type>tool</type>
-	<category>Basic</category>
+	<category>Third Party Addon</category>
 	<menuitems>
 		<extcfg>Extension Settings</extcfg>
 	</menuitems>
