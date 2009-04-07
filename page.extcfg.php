@@ -24,7 +24,7 @@ extcfg_init();
 switch ($action) {
   case "phone":
     extcfg_show_phone($_REQUEST['phone'], $_REQUEST['srv']);
-  break;
+	  break;
   case "phone_save":
     extcfg_save_phone($_REQUEST['ext'], $_REQUEST['srv']);
   default:
@@ -32,5 +32,6 @@ switch ($action) {
   break;
 }
 extcfg_exit();  
+
 ?>
 </div>

@@ -94,42 +94,41 @@ function extcfg_exit(){
   }
 }
 
-function extcfg_show_list()
+function extcfg_show_list($status = false)
 {
   global $server;
   $exts = array();
+	$i = 1;
+	
   foreach($server as $key => $serv){
     $exts = array_merge($exts, extcfg_get_extensions_amp($serv['db_host'], $serv['db_user'], $serv['db_passwd'], $serv['db_db'], $key));
-//    $yac[$key] = $serv['astman']->GetFamilyDB(YAC);
+		$status_arr = get_ext_status($serv['db_host'], $serv['db_user'], $serv['db_passwd'], $serv['db_db'], $key, $serv['astman']);
+
     $dnd[$key] = $serv['astman']->GetFamilyDB(DND);
     $cw[$key] = $serv['astman']->GetFamilyDB(CW);
     $cfim[$key] = $serv['astman']->GetFamilyDB(CFIM);
     $cfbs[$key] = $serv['astman']->GetFamilyDB(CFBS);
     $cfna[$key] = $serv['astman']->GetFamilyDB(CFNA);
-//    $cfnas[$key] = $serv['astman']->GetFamilyDB(CFNAS);
   }
   sort($exts);
   
-  echo "<table border='1'><tr><th>Ext</th><th>DND</th><th>Call<br>Waiting</th><th>Call Forward<br>All</th><th>Call Forward<br>Busy</th><th>Call Forward<br>No Answer</th></tr>";
+  echo "<table border='0' cellspacing='0' cellpadding='3'><tr><th>Ext</th><th>DND</th><th>Call<br>Waiting</th><th>Call Forward<br>All</th><th>Call Forward<br>Busy</th><th>Call Forward<br>No Answer</th><th>IP</th><th>port</th><th>Status</th><th>Device</th><th>Tech</th></tr>";
 
   foreach($exts as $ext){
-    echo "<tr><td>";
-    echo "<a href='" . $PHP_SELF . "?display=extcfg&type=tool&action=phone&phone={$ext[0]}&srv={$ext[1]}'>{$ext[0]}</a>";
-//    echo "</td><td>";
-//    echo $yac[$ext[1]][$ext[0]] . "&nbsp;";
-    echo "</td><td>";
-    echo $dnd[$ext[1]][$ext[0]] . "&nbsp;";
-    echo "</td><td>";
-    echo $cw[$ext[1]][$ext[0]] . "&nbsp;";
-    echo "</td><td>";
-    echo $cfim[$ext[1]][$ext[0]] . "&nbsp;";
-    echo "</td><td>";
-    echo $cfbs[$ext[1]][$ext[0]] . "&nbsp;";
-    echo "</td><td>";
-    echo $cfna[$ext[1]][$ext[0]] . "&nbsp;";
-//    echo "</td><td>";
-//    echo $cfnas[$ext[1]][$ext[0]] . "&nbsp;";
-    echo "</td></tr>";
+  	$status_bg = $status_arr[$ext[0]]['ok'] ? '#8f8' : '#f88';
+    echo "<tr bgcolor='" . varBg($i++) . "'>
+			<td><a href='" . $PHP_SELF . "?display=extcfg&type=tool&action=phone&phone={$ext[0]}&srv={$ext[1]}'>{$ext[0]}</a></td>
+			<td>{$dnd[$ext[1]][$ext[0]]}&nbsp;</td>
+			<td>{$cw[$ext[1]][$ext[0]]}&nbsp;</td>
+			<td>{$cfim[$ext[1]][$ext[0]]}&nbsp;</td>
+			<td>{$cfbs[$ext[1]][$ext[0]]}&nbsp;</td>
+			<td>{$cfna[$ext[1]][$ext[0]]}&nbsp;</td>
+			<td>{$status_arr[$ext[0]]['ip']}</td>
+			<td>{$status_arr[$ext[0]]['port']}</td>
+			<td style='background-color: $status_bg;'>{$status_arr[$ext[0]]['status']}</td>
+			<td>{$status_arr[$ext[0]]['device']}</td>
+			<td>{$status_arr[$ext[0]]['type']}</td>
+		</tr>";
   }
   
   echo "</table>";
@@ -227,6 +226,7 @@ function extcfg_get_extensions_amp($server, $user, $passwd, $db, $astman_nr)
 {
   $exts = array();
 
+	$sql = "SELECT id FROM devices d WHERE LENGTH(id) < 6 ORDER BY CAST(id AS UNSIGNED);";
   $sql_iax = "SELECT id,data FROM iax WHERE keyword = 'callerid' ORDER BY id";
   $sql_sip = "SELECT id,data FROM sip WHERE keyword = 'callerid' ORDER BY id";
   $sql_zap = "SELECT id,data FROM zap WHERE keyword = 'callerid' ORDER BY id";
@@ -234,6 +234,13 @@ function extcfg_get_extensions_amp($server, $user, $passwd, $db, $astman_nr)
   mysql_connect($server, $user, $passwd) or die ("Could not connect to MySQL");
   mysql_select_db($db) or die ("Could not select $db database");  
   
+	$result = mysql_query($sql) or die ("Query failed");
+  while ($kolumn = mysql_fetch_array($result)) {
+    $exts[] = array($kolumn["id"], $astman_nr);
+  }
+ 	
+  return ($exts);	
+	
   $result = mysql_query($sql_iax) or die ("IAX Query failed");
   while ($kolumn = mysql_fetch_array($result)) {
     $exts[] = array($kolumn["id"],$astman_nr);
@@ -250,5 +257,124 @@ function extcfg_get_extensions_amp($server, $user, $passwd, $db, $astman_nr)
   }
   sort($exts);
   return ($exts);
+}
+
+function get_ext_status($server, $user, $passwd, $db, $astman_nr, $astman){
+	$arr = array();	
+	$sccp_sep_arr = array();
+	
+	// SIP	
+	$sip_res = $astman->Query2("Action: sippeers\r\n\r\n", 'Event: PeerlistComplete');
+
+	$sip_peers = explode("\r\n\r\n", $sip_res);
+	
+	foreach ($sip_peers as $sip_peer) {
+		if (strpos($sip_peer, 'ObjectName')){
+			$extension = $astman->get_my_stuff($sip_peer, 'ObjectName: ', "\r\n");
+			
+			$arr[$extension] = array(
+				'ip' => $astman->get_my_stuff($sip_peer, 'IPaddress: ', "\r\n"), 
+				'port' => $astman->get_my_stuff($sip_peer, 'IPport: ', "\r\n"),
+				'status' => $astman->get_my_stuff($sip_peer, 'Status: ', "\r\n"),
+				'type' => 'SIP',
+				'device' => '',
+				'ok' => false
+			);		
+			if ($arr[$extension]['ip'] != '-none-' && $arr[$extension]['status'] != 'UNREACHABLE')
+				$arr[$extension]['ok'] = true;
+		}
+	}
+
+	// SCCP
+	
+	$sccp_devices_res = $astman->Query("Action: Command\r\nCommand: sccp show devices\r\n\r\n");
+	$sccp_lines_res = $astman->Query("Action: Command\r\nCommand: sccp show lines\r\n\r\n");
+
+	$sccp_lines = get_astman_lines($sccp_lines_res);
+	
+	unset($sccp_lines[0]);
+	unset($sccp_lines[1]);
+	unset($sccp_lines[2]);
+	unset($sccp_lines[3]);
+	foreach ($sccp_lines as $sccp_line){
+		$extension = trim(substr($sccp_line, 0, 16));
+		$sep = trim(substr($sccp_line, 16, 16));
+		if ($extension){
+			$sccp_sep_arr[$sep] = $extension;
+			$arr[$extension] = array('ip' => '', 'port' => '', 'status' => '', 'type' => 'SCCP', 'device' => $sep, 'ok' => false);
+		}
+	}
+	
+	$sccp_devices = get_astman_lines($sccp_devices_res);
+	unset($sccp_devices[0]);
+	unset($sccp_devices[1]);
+	unset($sccp_devices[2]);
+	unset($sccp_devices[3]);
+
+	foreach($sccp_devices as $sccp_device){
+		$status = trim(substr($sccp_device, -10));
+		$sep = trim(substr($sccp_device, -27, 16));
+		$ip = trim(substr($sccp_device, -43, 15));
+		$extension = $sccp_sep_arr[$sep];
+		$ok = $sep == '--' ? false : true;
+		if ($extension){
+			$arr[$extension] = array('ip' => $ip, 'port' => '', 'status' => $status, 'type' => 'SCCP', 'device' => $sep, 'ok' => $ok);
+		}
+	}
+	
+	// MGCP
+	
+	$mgcp_endpoints_res = $astman->Query("Action: Command\r\nCommand: mgcp show endpoints\r\n\r\n");
+	
+	$mgcp_endpoints = get_astman_lines($mgcp_endpoints_res);
+	unset($mgcp_endpoints[0]);
+	
+	foreach($mgcp_endpoints as $mgcp_endpoint){
+		$extension = '';
+		$items = explode(' ', trim($mgcp_endpoint));
+		if ($items[0] == 'Gateway'){ // First line
+			$ip = $items[3];
+			$device = str_replace("'", '', $items[1]);
+		}else{
+			$line = str_replace("'", '', $items[1]);
+			$status = $items[5];
+			
+			$sql = "SELECT d.`id` 
+							FROM devices d 
+							WHERE d.`dial` = 'MGCP/$line'";
+							
+			if ($query = mysql_query($sql)){
+				if ($row = mysql_fetch_assoc($query)){
+					$extension = $row['id'];
+				}
+			}
+		
+			if ($extension){
+				$ok = $ip == '0.0.0.0' ? false : true;
+					 
+				$arr[$extension] = array('ip' => $ip, 'port' => '', 'status' => $status, 'type' => 'MGCP', 'device' => $device, 'ok' => $ok);
+			}
+		}
+	}
+	
+	return $arr;	
+}
+
+function get_astman_lines($wrets){
+	$value_start = strpos($wrets, "Response: Follows\r\n") + 19;
+	$value_stop = strpos($wrets, "--END COMMAND--\r\n", $value_start);
+	if ($value_start > 18){
+		$wrets = substr($wrets, $value_start, $value_stop - $value_start);
+	}
+	$lines = explode("\n", $wrets);
+	
+	return $lines;
+}
+
+function varBg($i = 0){
+	if($i%2 == 0)
+		return '#fff';
+	else
+		return '#eee';
 }
 ?>
