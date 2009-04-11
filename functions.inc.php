@@ -16,9 +16,6 @@ function extcfg_destinations() {
 	return null;
 }
 
-/* 	Generates dialplan for conferences
-	We call this with retrieve_conf
-*/
 function extcfg_get_config($engine) {
 
 }
@@ -282,6 +279,29 @@ function get_ext_status($server, $user, $passwd, $db, $astman_nr, $astman){
 			);		
 			if ($arr[$extension]['ip'] != '-none-' && $arr[$extension]['status'] != 'UNREACHABLE')
 				$arr[$extension]['ok'] = true;
+		}
+	}
+	
+	// IAX
+	
+	$iax_res = $astman->Query2("Action: IAXpeerlist\r\n\r\n", 'PeerlistComplete');
+
+	$iax_peers = explode("\r\n\r\n", $iax_res);
+		
+	foreach ($iax_peers as $iax_peer) {
+		if (strpos($iax_peer, 'ObjectName')){
+			$extension = $astman->get_my_stuff($iax_peer, 'ObjectName: ', "\r\n");
+			
+			$arr[$extension] = array(
+				'ip' => $astman->get_my_stuff($iax_peer, 'IPaddress: ', "\r\n"), 
+				'port' => $astman->get_my_stuff($iax_peer, 'Port: ', "\r\n"),
+				'status' => $astman->get_my_stuff($iax_peer, 'Status: '),
+				'type' => 'IAX2',
+				'device' => '',
+				'ok' => false
+			);		
+			if ($arr[$extension]['ip'] != '-none-' && $arr[$extension]['status'] != 'UNREACHABLE')
+				$arr[$extension]['ok'] = true;				
 		}
 	}
 
