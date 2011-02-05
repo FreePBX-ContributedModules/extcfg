@@ -25,11 +25,13 @@ define("CFBS", "CFB");
 define("CFNA", "CFU");
 define("CFIM", "CF");
 define("YAC", "YAC");
+define("DND", "DND");
 
 require("astman.inc");
 
 function extcfg_init(){
-  global $server;
+  global $server, $amp_conf;
+
 /*  mysql_connect('localhost', 'asteriskuser', 'amp109') or die ("Could not connect to MySQL");
   mysql_select_db('asterisk') or die ("Could not select asterisk database" . mysql_error());  
   
@@ -50,17 +52,18 @@ function extcfg_init(){
     $server[$i]["astman"] = new AstMan;
     $i++;
   }
+
   */
   
   $server[] = array(
-   "db_host" => "localhost",
-   "db_user" => "asteriskuser",
-   "db_passwd" => "amp109", 
-   "db_db" => "asterisk",
-   "astman_host" => "localhost",
-   "astman_user" => "admin", 
-   "astman_passwd" => "amp111", 
-   "name" => "mlin1",
+   "db_host" => $amp_conf['AMPDBHOST'],
+   "db_user" => $amp_conf['AMPDBUSER'],
+   "db_passwd" => $amp_conf['AMPDBPASS'], 
+   "db_db" => $amp_conf['AMPDBNAME'],
+   "astman_host" => 'localhost',
+   "astman_user" => $amp_conf['AMPMGRUSER'], 
+   "astman_passwd" => $amp_conf['AMPMGRPASS'], 
+   "name" => "localhost",
    "astman" => new AstMan
   );
   /*
@@ -109,22 +112,38 @@ function extcfg_show_list($status = false)
   }
   sort($exts);
   
-  echo "<table border='0' cellspacing='0' cellpadding='3'><tr><th>Ext</th><th>DND</th><th>Call<br>Waiting</th><th>Call Forward<br>All</th><th>Call Forward<br>Busy</th><th>Call Forward<br>No Answer</th><th>IP</th><th>port</th><th>Status</th><th>Device</th><th>Tech</th></tr>";
+  echo "<table border='0' cellspacing='0' cellpadding='3' style=''><tr><th></th><th>Extension</th><th>DND</th><th>Call<br>Waiting</th><th>Call Forward<br>All</th><th>Call Forward<br>Busy</th><th>Call Forward<br>No Answer</th><th>IP</th><th>port</th><th>Status</th><th>Device</th><th>Tech</th></tr>";
 
   foreach($exts as $ext){
-  	$status_bg = $status_arr[$ext[0]]['ok'] ? '#8f8' : '#f88';
+  	$status_bg = $status_arr[$ext[0]]['ok'] ? '#88ff88' : '#ff8888';
+	$dnd_f = empty($dnd[$ext[1]][$ext[0]]) ? '' : '<img src="/admin/images/accept.png" border="0">';
+	$cw_f = '';
+	if(!empty($cw[$ext[1]][$ext[0]])){
+		if($cw[$ext[1]][$ext[0]] == 'ENABLED'){
+			$cw_f = '<img src="/admin/images/accept.png" border="0">';
+		}
+	}
+	$cfim_f = empty($cfim[$ext[1]][$ext[0]]) ? '' : $cfim[$ext[1]][$ext[0]];
+	$cfbs_f = empty($cfbs[$ext[1]][$ext[0]]) ? '' : $cfbs[$ext[1]][$ext[0]];
+	$cfna_f = empty($cfna[$ext[1]][$ext[0]]) ? '' : $cfna[$ext[1]][$ext[0]];
+	$ip = empty($status_arr[$ext[0]]['ip']) ? '' : $status_arr[$ext[0]]['ip'];
+	$port = empty($status_arr[$ext[0]]['port']) ? '' : $status_arr[$ext[0]]['port'];
+	$status = empty($status_arr[$ext[0]]['status']) ? '' : $status_arr[$ext[0]]['status'];
+	$device = empty($status_arr[$ext[0]]['device']) ? '' : $status_arr[$ext[0]]['device'];
+	$type = empty($status_arr[$ext[0]]['type']) ? '' : $status_arr[$ext[0]]['type'];
     echo "<tr bgcolor='" . varBg($i++) . "'>
-			<td><a href='" . $PHP_SELF . "?display=extcfg&type=tool&action=phone&phone={$ext[0]}&srv={$ext[1]}'>{$ext[0]}</a></td>
-			<td>{$dnd[$ext[1]][$ext[0]]}&nbsp;</td>
-			<td>{$cw[$ext[1]][$ext[0]]}&nbsp;</td>
-			<td>{$cfim[$ext[1]][$ext[0]]}&nbsp;</td>
-			<td>{$cfbs[$ext[1]][$ext[0]]}&nbsp;</td>
-			<td>{$cfna[$ext[1]][$ext[0]]}&nbsp;</td>
-			<td>{$status_arr[$ext[0]]['ip']}</td>
-			<td>{$status_arr[$ext[0]]['port']}</td>
-			<td style='background-color: $status_bg;'>{$status_arr[$ext[0]]['status']}</td>
-			<td>{$status_arr[$ext[0]]['device']}</td>
-			<td>{$status_arr[$ext[0]]['type']}</td>
+			<td><a href='/admin/config.php?type=setup&display=extensions&extdisplay={$ext[0]}'><img src='/admin/images/telephone_edit.png' border=0 title='Edit extension'></a></td>
+			<td><a href='" . $_SERVER['PHP_SELF'] . "?display=extcfg&type=tool&action=phone&phone={$ext[0]}&srv={$ext[1]}'>{$ext[0]} - {$ext[2]}</a></td>
+			<td style='text-align: center;'>$dnd_f&nbsp;</td>
+			<td style='text-align: center;'>$cw_f&nbsp;</td>
+			<td>$cfim_f&nbsp;</td>
+			<td>$cfbs_f&nbsp;</td>
+			<td>$cfna_f&nbsp;</td>
+			<td>$ip</td>
+			<td>$port</td>
+			<td style='background-color: $status_bg;'>$status</td>
+			<td>$device</td>
+			<td>$type</td>
 		</tr>";
   }
   
@@ -193,27 +212,23 @@ function extcfg_save_phone($ext, $srv)
   global $server;
   $serv = $server[$srv];
 
-/*  if ($_REQUEST["YAC"])
-    $serv['astman']->PutDB(YAC, $ext, $_REQUEST["YAC"]);
-  else
-    $serv['astman']->DelDB(YAC, $ext);    */
-  if ($_REQUEST["DND"])
+  if (isset($_REQUEST["DND"]))
     $serv['astman']->PutDB(DND, $ext, "YES");
   else
     $serv['astman']->DelDB(DND, $ext);    
-  if ($_REQUEST["CW"])
+  if (isset($_REQUEST["CW"]))
     $serv['astman']->PutDB(CW, $ext, "ENABLED");
   else
     $serv['astman']->DelDB(CW, $ext);    
-  if ($_REQUEST["CFBS"])
+  if (!empty($_REQUEST["CFBS"]))
     $serv['astman']->PutDB(CFBS, $ext, $_REQUEST["CFBS"]);
   else
     $serv['astman']->DelDB(CFBS, $ext);    
-  if ($_REQUEST["CFIM"])
+  if (!empty($_REQUEST["CFIM"]))
     $serv['astman']->PutDB(CFIM, $ext, $_REQUEST["CFIM"]);
   else
     $serv['astman']->DelDB(CFIM, $ext);    
-  if ($_REQUEST["CFNA"])
+  if (!empty($_REQUEST["CFNA"]))
     $serv['astman']->PutDB(CFNA, $ext, $_REQUEST["CFNA"]);
   else
     $serv['astman']->DelDB(CFNA, $ext);    
@@ -223,37 +238,17 @@ function extcfg_get_extensions_amp($server, $user, $passwd, $db, $astman_nr)
 {
   $exts = array();
 
-	$sql = "SELECT id FROM devices d WHERE LENGTH(id) < 6 ORDER BY CAST(id AS UNSIGNED);";
-  $sql_iax = "SELECT id,data FROM iax WHERE keyword = 'callerid' ORDER BY id";
-  $sql_sip = "SELECT id,data FROM sip WHERE keyword = 'callerid' ORDER BY id";
-  $sql_zap = "SELECT id,data FROM zap WHERE keyword = 'callerid' ORDER BY id";
+  $sql = "SELECT id, description FROM devices d ORDER BY CAST(id AS UNSIGNED);";
   
   mysql_connect($server, $user, $passwd) or die ("Could not connect to MySQL");
   mysql_select_db($db) or die ("Could not select $db database");  
   
-	$result = mysql_query($sql) or die ("Query failed");
+  $result = mysql_query($sql) or die ("Query failed");
   while ($kolumn = mysql_fetch_array($result)) {
-    $exts[] = array($kolumn["id"], $astman_nr);
+    $exts[] = array($kolumn["id"], $astman_nr, $kolumn['description']);
   }
  	
   return ($exts);	
-	
-  $result = mysql_query($sql_iax) or die ("IAX Query failed");
-  while ($kolumn = mysql_fetch_array($result)) {
-    $exts[] = array($kolumn["id"],$astman_nr);
-  }
-  
-  $result = mysql_query($sql_sip) or die ("SIP Query failed");
-  while ($kolumn = mysql_fetch_array($result)) {
-    $exts[] = array($kolumn["id"],$astman_nr);
-  }
-  
-  $result = mysql_query($sql_zap) or die ("ZAP Query failed");
-  while ($kolumn = mysql_fetch_array($result)) {
-    $exts[] = array($kolumn["id"],$astman_nr);
-  }
-  sort($exts);
-  return ($exts);
 }
 
 function get_ext_status($server, $user, $passwd, $db, $astman_nr, $astman){
@@ -335,7 +330,7 @@ function get_ext_status($server, $user, $passwd, $db, $astman_nr, $astman){
 		$status = trim(substr($sccp_device, -10));
 		$sep = trim(substr($sccp_device, -27, 16));
 		$ip = trim(substr($sccp_device, -43, 15));
-		$extension = $sccp_sep_arr[$sep];
+		$extension = empty($sccp_sep_arr[$sep]) ? null : $sccp_sep_arr[$sep];
 		$ok = $sep == '--' ? false : true;
 		if ($extension){
 			$arr[$extension] = array('ip' => $ip, 'port' => '', 'status' => $status, 'type' => 'SCCP', 'device' => $sep, 'ok' => $ok);
@@ -345,10 +340,12 @@ function get_ext_status($server, $user, $passwd, $db, $astman_nr, $astman){
 	// MGCP
 	
 	$mgcp_endpoints_res = $astman->Query("Action: Command\r\nCommand: mgcp show endpoints\r\n\r\n");
+
+	if (strpos($mgcp_endpoints_res, 'Gateway')){
 	
 	$mgcp_endpoints = get_astman_lines($mgcp_endpoints_res);
 	unset($mgcp_endpoints[0]);
-	
+
 	foreach($mgcp_endpoints as $mgcp_endpoint){
 		$extension = '';
 		$items = explode(' ', trim($mgcp_endpoint));
@@ -376,6 +373,7 @@ function get_ext_status($server, $user, $passwd, $db, $astman_nr, $astman){
 			}
 		}
 	}
+	}
 	
 	return $arr;	
 }
@@ -393,8 +391,8 @@ function get_astman_lines($wrets){
 
 function varBg($i = 0){
 	if($i%2 == 0)
-		return '#fff';
+		return '#ffffff';
 	else
-		return '#eee';
+		return '#eeeeee';
 }
 ?>

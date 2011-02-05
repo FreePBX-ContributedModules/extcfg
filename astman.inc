@@ -278,4 +278,3 @@ Status: 0
 		return $res;
 	}
 }
-?> 
