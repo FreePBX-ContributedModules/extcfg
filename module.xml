@@ -1,12 +1,16 @@
 <module>
 	<rawname>extcfg</rawname>
 	<name>Extension Configurtion</name>
-	<version>0.1</version>
+	<version>0.1.1</version>
 	<type>tool</type>
 	<category>Third Party Addon</category>
 	<menuitems>
 		<extcfg>Extension Configuration</extcfg>
 	</menuitems>
-	<location>release/extcfg-0.1.tgz</location>
-	<md5sum>40a60ac6a9edaee125f6f1c6887260c1</md5sum>
+	<changelog>
+		*0.1*   First release
+		*0.1.1* Rename module
+	</changelog>
+	<location>contributed_modules/release/extcfg-0.1.1.tgz</location>
+	<md5sum>6a9ff7489c6c342ebc4fbabef765e6f8</md5sum>
 </module>
