@@ -1,13 +1,12 @@
 <module>
 	<rawname>extcfg</rawname>
-	<name>Extension Settings</name>
+	<name>Extension Configurtion</name>
 	<version>0.1</version>
 	<type>tool</type>
 	<category>Third Party Addon</category>
 	<menuitems>
-		<extcfg>Extension Settings</extcfg>
+		<extcfg>Extension Configuration</extcfg>
 	</menuitems>
-	<info>http://tese.se/extcfg.html</info>
 	<location>release/extcfg-0.1.tgz</location>
 	<md5sum>40a60ac6a9edaee125f6f1c6887260c1</md5sum>
 </module>
